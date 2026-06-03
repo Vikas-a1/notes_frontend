@@ -3,7 +3,7 @@ namee  : deply notes application
 on:
   push:
     branches:
-      - main
+      - staging
 
 jobs:
   build:
