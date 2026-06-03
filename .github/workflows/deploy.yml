@@ -1,4 +1,4 @@
-namee  : deply notes application
+name: Deploy notes application
 
 on:
   push:
