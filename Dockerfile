@@ -21,6 +21,10 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+
+# Vite embeds VITE_* at build time (runtime env in compose does not change the bundle)
+ARG VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Step 2 serve using nginx
