@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import "./App.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || "";
+
+function isAppsScriptUrl(url) {
+  return /script\.google\.com\/macros\/s\/[^/]+\/exec/.test(url);
+}
+
+function isGoogleSheetUrl(url) {
+  return /docs\.google\.com\/spreadsheets\//.test(url);
+}
 
 /* ── Particles ── */
 const PARTICLES = Array.from({ length: 55 }, (_, i) => ({
@@ -150,6 +159,9 @@ export default function App() {
   const scrollToApp = () =>
     document.getElementById("app-section")?.scrollIntoView({ behavior: "smooth" });
 
+  const scrollToContact = () =>
+    document.getElementById("contact-section")?.scrollIntoView({ behavior: "smooth" });
+
   return (
     <>
       {/* Cursor glow */}
@@ -174,7 +186,7 @@ export default function App() {
       </div>
 
       {/* ── HERO ── */}
-      <Hero onScrollToApp={scrollToApp} />
+      <Hero onScrollToApp={scrollToApp} onScrollToContact={scrollToContact} />
 
       {/* ── APP SECTION ── */}
       <div id="app-section" className="page">
@@ -237,6 +249,13 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* ── CONTACT SECTION ── */}
+      <div id="contact-section" className="page contact-page">
+        <div className="container">
+          <ContactForm />
+        </div>
+      </div>
     </>
   );
 }
@@ -244,7 +263,7 @@ export default function App() {
 /* ═══════════════════════════════════════════
    HERO SECTION
    ═══════════════════════════════════════════ */
-function Hero({ onScrollToApp }) {
+function Hero({ onScrollToApp, onScrollToContact }) {
   const heroRef = useRef(null);
   const [tilt, setTilt, resetTilt] = useLerpedTilt();
 
@@ -298,6 +317,7 @@ function Hero({ onScrollToApp }) {
             </svg>
           </button>
           <button className="hero-ghost" onClick={onScrollToApp}>View Notes</button>
+          <button className="hero-ghost" onClick={onScrollToContact}>Contact Us</button>
         </div>
 
         <div className="hero-stats">
@@ -408,5 +428,184 @@ function NoteCard({ note, onDelete }) {
         <span className="card-id">{note.id.slice(-8)}</span>
       </div>
     </div>
+  );
+}
+
+/* ── Contact form → Google Sheet ── */
+function ContactForm() {
+  const [name, setName]         = useState("");
+  const [email, setEmail]       = useState("");
+  const [phone, setPhone]       = useState("");
+  const [subject, setSubject]   = useState("");
+  const [message, setMessage]   = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState(false);
+
+  useEffect(() => {
+    const el = document.getElementById("contact-section");
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add("visible"); obs.disconnect(); } },
+      { threshold: 0.06 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setError("Name, email, and message are required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!GOOGLE_SCRIPT_URL) {
+      setError("Contact form is not configured. Set VITE_GOOGLE_SCRIPT_URL in your environment.");
+      return;
+    }
+    if (isGoogleSheetUrl(GOOGLE_SCRIPT_URL)) {
+      setError(
+        "Wrong URL configured: use the Apps Script Web App URL (script.google.com/.../exec), not the Google Sheet link."
+      );
+      return;
+    }
+    if (!isAppsScriptUrl(GOOGLE_SCRIPT_URL)) {
+      setError("VITE_GOOGLE_SCRIPT_URL must be a deployed Apps Script web app URL ending in /exec.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess(false);
+
+    try {
+      const params = new URLSearchParams({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+
+      const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+      const text = await res.text();
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          "Apps Script returned HTML instead of JSON. Redeploy the script as a Web app with access set to Anyone."
+        );
+      }
+
+      if (!data.success) throw new Error(data.error || "Submission failed");
+
+      setSuccess(true);
+      setName("");
+      setEmail("");
+      setPhone("");
+      setSubject("");
+      setMessage("");
+    } catch (err) {
+      setError(err.message || "Failed to submit contact form. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <>
+      <header className="header">
+        <div className="header-badge">
+          <span className="badge-dot" />
+          Get in Touch
+        </div>
+        <h2 className="app-title">Contact Us</h2>
+        <p className="app-subtitle">We&apos;ll save your details and get back to you soon</p>
+      </header>
+
+      <form className="form contact-form" onSubmit={handleSubmit}>
+        <div className="form-row">
+          <div className="form-field">
+            <div className="form-label">Full Name *</div>
+            <input
+              className="form-input"
+              type="text"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <div className="form-label">Email *</div>
+            <input
+              className="form-input"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-field">
+            <div className="form-label">Phone</div>
+            <input
+              className="form-input"
+              type="tel"
+              placeholder="+1 234 567 8900"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          <div className="form-field">
+            <div className="form-label">Subject</div>
+            <input
+              className="form-input"
+              type="text"
+              placeholder="How can we help?"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="form-field">
+          <div className="form-label">Message *</div>
+          <textarea
+            className="form-input form-textarea"
+            placeholder="Tell us more about your inquiry..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            required
+          />
+        </div>
+
+        <button className="btn-add" type="submit" disabled={loading}>
+          {loading ? (
+            <span className="btn-loading"><span className="spinner" />Sending...</span>
+          ) : "Send Message"}
+        </button>
+      </form>
+
+      {error && (
+        <div className="error-msg"><span>⚠</span>{error}</div>
+      )}
+
+      {success && (
+        <div className="success-msg">
+          <span>✓</span>
+          Thank you! Your contact details have been saved successfully.
+        </div>
+      )}
+    </>
   );
 }
