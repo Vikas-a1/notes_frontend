@@ -13,7 +13,10 @@ export default {
           return Response.json(
             {
               success: false,
-              error: "Contact form is not configured. Set GOOGLE_SCRIPT_URL as a Worker secret.",
+              error:
+                "Contact form is not configured. In Cloudflare Builds, add GOOGLE_SCRIPT_URL " +
+                "(or VITE_GOOGLE_SCRIPT_URL) under Variables and secrets, set deploy command to " +
+                "'npm run deploy', and redeploy.",
             },
             { status: 503, headers: corsHeaders() }
           );
