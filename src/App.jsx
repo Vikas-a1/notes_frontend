@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import "./App.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || "";
 
 function isAppsScriptUrl(url) {
   return /script\.google\.com\/macros\/s\/[^/]+\/exec/.test(url);
@@ -10,6 +9,26 @@ function isAppsScriptUrl(url) {
 
 function isGoogleSheetUrl(url) {
   return /docs\.google\.com\/spreadsheets\//.test(url);
+}
+
+function buildContactRequestUrl(params) {
+  if (import.meta.env.DEV) {
+    const scriptUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL || "";
+    if (!scriptUrl) {
+      throw new Error("Set VITE_GOOGLE_SCRIPT_URL in .env for local development.");
+    }
+    if (isGoogleSheetUrl(scriptUrl)) {
+      throw new Error(
+        "Wrong URL in .env: use the Apps Script Web App URL (script.google.com/.../exec), not the Google Sheet link."
+      );
+    }
+    if (!isAppsScriptUrl(scriptUrl)) {
+      throw new Error("VITE_GOOGLE_SCRIPT_URL must be a deployed Apps Script web app URL ending in /exec.");
+    }
+    return `${scriptUrl}?${params}`;
+  }
+
+  return `/api/contact?${params}`;
 }
 
 /* ── Particles ── */
@@ -463,20 +482,6 @@ function ContactForm() {
       setError("Please enter a valid email address.");
       return;
     }
-    if (!GOOGLE_SCRIPT_URL) {
-      setError("Contact form is not configured. Set VITE_GOOGLE_SCRIPT_URL in your environment.");
-      return;
-    }
-    if (isGoogleSheetUrl(GOOGLE_SCRIPT_URL)) {
-      setError(
-        "Wrong URL configured: use the Apps Script Web App URL (script.google.com/.../exec), not the Google Sheet link."
-      );
-      return;
-    }
-    if (!isAppsScriptUrl(GOOGLE_SCRIPT_URL)) {
-      setError("VITE_GOOGLE_SCRIPT_URL must be a deployed Apps Script web app URL ending in /exec.");
-      return;
-    }
 
     setLoading(true);
     setError("");
@@ -491,7 +496,7 @@ function ContactForm() {
         message: message.trim(),
       });
 
-      const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+      const res = await fetch(buildContactRequestUrl(params.toString()));
       const text = await res.text();
 
       let data;

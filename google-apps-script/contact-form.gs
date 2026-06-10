@@ -8,7 +8,7 @@
  * 3. Deploy → New deployment → Web app
  *    - Execute as: Me
  *    - Who has access: Anyone
- * 4. Copy the Web app URL into VITE_GOOGLE_SCRIPT_URL in your .env
+ * 4. Set GOOGLE_SCRIPT_URL as a Cloudflare Worker secret (runtime, not build)
  */
 
 const SHEET_NAME = "Contacts";
